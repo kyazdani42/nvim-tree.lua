@@ -1,6 +1,7 @@
 local api = vim.api
 local luv = vim.loop
 
+local debug = require'nvim-tree.debug'
 local renderer = require'nvim-tree.renderer'
 local config = require'nvim-tree.config'
 local git = require'nvim-tree.git'
@@ -45,6 +46,7 @@ M.Tree = {
 }
 
 function M.init(with_open, with_render)
+  debug.mark("init")
   M.Tree.cwd = luv.cwd()
   git.git_root(M.Tree.cwd)
   git.update_gitignore_map_sync()
@@ -61,9 +63,11 @@ function M.init(with_open, with_render)
     renderer.draw(M.Tree, true)
     M.Tree.loaded = true
   end
+  debug.debug("init")
 end
 
 local function get_node_at_line(line)
+  debug.mark("get_node_at_line")
   local index = 2
   local function iter(entries)
     for _, node in ipairs(entries) do
@@ -77,10 +81,12 @@ local function get_node_at_line(line)
       end
     end
   end
+  debug.debug("get_node_at_line")
   return iter
 end
 
 local function get_line_from_node(node, find_parent)
+  debug.mark("get_line_from_node")
   local node_path = node.absolute_path
 
   if find_parent then
@@ -101,10 +107,12 @@ local function get_line_from_node(node, find_parent)
       end
     end
   end
+  debug.debug("get_line_from_node")
   return iter
 end
 
 function M.get_node_at_cursor()
+  debug.mark("get_node_at_cursor")
   local cursor = api.nvim_win_get_cursor(M.Tree.winnr())
   local line = cursor[1]
   if line == 1 and M.Tree.cwd ~= "/" then
@@ -114,19 +122,23 @@ function M.get_node_at_cursor()
   if M.Tree.cwd == "/" then
     line = line + 1
   end
+  debug.debug("get_node_at_cursor")
   return get_node_at_line(line)(M.Tree.entries)
 end
 
 -- If node is grouped, return the last node in the group. Otherwise, return the given node.
 function M.get_last_group_node(node)
+  debug.mark("get_last_group_node")
   local next = node
   while next.group_next do
     next = next.group_next
   end
+  debug.debug("get_last_group_node")
   return next
 end
 
 function M.unroll_dir(node)
+  debug.mark("unroll_dir")
   node.open = not node.open
   if node.has_children then node.has_children = false end
   if #node.entries > 0 then
@@ -137,9 +149,11 @@ function M.unroll_dir(node)
     populate(node.entries, node.link_to or node.absolute_path, node)
     renderer.draw(M.Tree, true)
   end
+  debug.debug("unroll_dir")
 end
 
 local function refresh_git(node, update_gitignore)
+  debug.mark("git")
   if not node then node = M.Tree end
   if update_gitignore == nil or update_gitignore == true then
     git.update_gitignore_map_sync()
@@ -150,19 +164,23 @@ local function refresh_git(node, update_gitignore)
       refresh_git(entry, false)
     end
   end
+  debug.debug("git")
 end
 
 -- TODO update only entries where directory has changed
 local function refresh_nodes(node)
+  debug.mark("refresh_nodes")
   refresh_entries(node.entries, node.absolute_path or node.cwd, node)
   for _, entry in ipairs(node.entries) do
     if entry.entries and entry.open then
       refresh_nodes(entry)
     end
   end
+  debug.debug("refresh_nodes")
 end
 
 function M.refresh_tree()
+  debug.mark("refresh_tree")
   if vim.v.exiting ~= nil then return end
 
   refresh_nodes(M.Tree)
@@ -176,9 +194,11 @@ function M.refresh_tree()
   else
     M.Tree.loaded = false
   end
+  debug.debug("refresh_tree")
 end
 
 function M.set_index_and_redraw(fname)
+  debug.mark("set_index_and_redraw")
   local i
   if M.Tree.cwd == '/' then
     i = 0
@@ -215,15 +235,18 @@ function M.set_index_and_redraw(fname)
   local index = iter(M.Tree.entries)
   if not M.win_open() then
     M.Tree.loaded = false
+    debug.debug("set_index_and_redraw")
     return
   end
   renderer.draw(M.Tree, reload)
   if index then
     api.nvim_win_set_cursor(M.Tree.winnr(), {index, 0})
   end
+  debug.debug("set_index_and_redraw")
 end
 
 function M.open_file(mode, filename)
+  debug.mark("open_file")
   local target_winnr = vim.fn.win_id2win(M.Tree.target_winid)
   local target_bufnr = target_winnr > 0 and vim.fn.winbufnr(M.Tree.target_winid)
   local splitcmd = window_opts.split_command == 'splitright' and 'vsplit' or 'split'
@@ -258,10 +281,12 @@ function M.open_file(mode, filename)
   if mode == 'preview' then
     if not found then M.set_target_win() end
     M.win_focus()
+    debug.debug("open_file")
     return
   end
 
   if found then
+    debug.debug("open_file")
     return
   end
 
@@ -274,9 +299,11 @@ function M.open_file(mode, filename)
   if vim.g.nvim_tree_quit_on_open == 1 and mode ~= 'preview' then
     M.close()
   end
+  debug.debug("open_file")
 end
 
 function M.change_dir(foldername)
+  debug.mark("change_dir")
   if vim.fn.expand(foldername) == M.Tree.cwd then
     return
   end
@@ -284,6 +311,7 @@ function M.change_dir(foldername)
   api.nvim_command('cd '..foldername)
   M.Tree.entries = {}
   M.init(false, M.Tree.bufnr ~= nil)
+  debug.debug("change_dir")
 end
 
 local function set_mapping(buf, key, cb)
@@ -293,6 +321,7 @@ local function set_mapping(buf, key, cb)
 end
 
 local function set_mappings()
+  debug.mark("set_mappings")
   if vim.g.nvim_tree_disable_keybindings == 1 then
     return
   end
@@ -303,6 +332,7 @@ local function set_mappings()
   for key,cb in pairs(bindings) do
     set_mapping(buf, key, cb)
   end
+  debug.debug("set_mappings")
 end
 
 local function create_buf()
@@ -329,10 +359,13 @@ local function create_win()
 end
 
 function M.close()
+  debug.mark("close")
   if #api.nvim_list_wins() == 1 then
+    debug.debug("close")
     return vim.cmd ':q!'
   end
   api.nvim_win_close(M.Tree.winnr(), true)
+  debug.debug("close")
 end
 
 function M.set_target_win()
@@ -340,6 +373,7 @@ function M.set_target_win()
 end
 
 function M.open()
+  debug.mark("open")
   M.set_target_win()
 
   if not M.buf_exists() then
@@ -361,6 +395,7 @@ function M.open()
 
   api.nvim_buf_set_option(M.Tree.bufnr, 'filetype', M.Tree.buf_name)
   api.nvim_command('setlocal '..window_opts.split_command)
+  debug.debug("open")
 end
 
 function M.sibling(node, direction)
@@ -431,6 +466,7 @@ function M.win_open()
 end
 
 function M.win_focus(winnr, open_if_closed)
+  debug.mark("win_focus")
   local wnr = winnr or M.Tree.winnr()
 
   if vim.api.nvim_win_get_tabpage(wnr) ~= vim.api.nvim_win_get_tabpage(0) then
@@ -442,6 +478,7 @@ function M.win_focus(winnr, open_if_closed)
   end
 
   api.nvim_set_current_win(wnr)
+  debug.debug("win_focus")
 end
 
 function M.buf_exists()
