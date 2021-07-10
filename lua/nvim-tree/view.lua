@@ -133,7 +133,8 @@ function M.setup()
     vim.bo[M.View.bufnr][k] = v
   end
 
-  vim.cmd "au! BufWinEnter * lua require'nvim-tree.view'._prevent_buffer_override()"
+  vim.cmd "au! BufWinEnter,BufWinLeave * lua require'nvim-tree.view'._prevent_buffer_override()"
+  vim.cmd "au! BufEnter,BufNewFile * lua require'nvim-tree'.open_on_directory()"
   if vim.g.nvim_tree_disable_keybindings == 1 then
     return
   end
@@ -179,9 +180,18 @@ function M._prevent_buffer_override()
   vim.schedule(function()
     local curwin = a.nvim_get_current_win()
     local curbuf = a.nvim_win_get_buf(curwin)
-    if curwin ~= M.get_winnr() or curbuf == M.View.bufnr then return end
+
+    if curwin ~= M.get_winnr() or curbuf == M.View.bufnr then
+      return
+    end
 
     vim.cmd("buffer "..M.View.bufnr)
+
+    local bufname = a.nvim_buf_get_name(curbuf)
+    local isdir = vim.fn.isdirectory(bufname) == 1
+    if isdir or not bufname or bufname == "" then
+      return
+    end
 
     if #vim.api.nvim_list_wins() < 2 then
       vim.cmd("vsplit")

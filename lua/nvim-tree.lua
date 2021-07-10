@@ -144,6 +144,9 @@ function M.on_enter()
     and ((is_dir and netrw_disabled) or bufname == '')
     and not vim.tbl_contains(ft_ignore, buftype)
   lib.init(should_open, should_open)
+  if bufname == '' or is_dir then
+    vim.cmd ":only"
+  end
 end
 
 local function is_file_readable(fname)
@@ -203,6 +206,23 @@ local function update_root_dir()
   if lib.Tree.cwd == new_cwd then return end
 
   lib.change_dir(new_cwd)
+end
+
+function M.open_on_directory()
+  local buf = api.nvim_get_current_buf()
+  local bufname = api.nvim_buf_get_name(buf)
+  if vim.fn.isdirectory(bufname) ~= 1 or bufname == lib.Tree.cwd then
+    return
+  end
+
+  if not view.win_open() then
+    view.open()
+  end
+  lib.change_dir(bufname)
+  lib.set_index_and_redraw(bufname)
+  view.focus()
+  vim.cmd ":only"
+  vim.cmd(":bd "..bufname)
 end
 
 function M.buf_enter()
