@@ -7,7 +7,7 @@ Author: Yazdani Kiyan <yazdani.kiyan@protonmail.com>
 ==============================================================================
 INTRODUCTION                                       *nvim-tree-introduction*
 
-This file explorer requires neovim `nightly (>= 0.5.0)`
+This file explorer requires `neovim >= 0.5.0`
 
 ==============================================================================
 QUICK START                                        *nvim-tree-quickstart*
