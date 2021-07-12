@@ -116,6 +116,18 @@ local function clear_buffer(absolute_path)
   end
 end
 
+local function rename_loaded_buffers(old_name, new_name)
+    for _, buf in pairs(api.nvim_list_bufs()) do
+      if api.nvim_buf_is_loaded(buf) then
+        if api.nvim_buf_get_name(buf) == old_name then
+          api.nvim_buf_set_name(buf, new_name)
+          -- to avoid the 'overwrite existing file' error message on write
+          vim.api.nvim_buf_call(buf, function() vim.cmd("silent! w!") end)
+        end
+      end
+    end
+end
+
 local function remove_dir(cwd)
   local handle = luv.fs_scandir(cwd)
   if type(handle) == 'string' then
@@ -165,6 +177,15 @@ local function do_copy(source, destination)
     if not success then return success, msg end
   end
 
+  return true
+end
+
+local function do_cut(source, destination)
+  local success = luv.fs_rename(source, destination)
+  if not success then
+    return success
+  end
+  rename_loaded_buffers(source, destination)
   return true
 end
 
@@ -273,15 +294,7 @@ function M.rename(with_sub)
       return api.nvim_err_writeln('Could not rename '..node.absolute_path..' to '..new_name)
     end
     api.nvim_out_write(node.absolute_path..' ➜ '..new_name..'\n')
-    for _, buf in pairs(api.nvim_list_bufs()) do
-      if api.nvim_buf_is_loaded(buf) then
-        if api.nvim_buf_get_name(buf) == node.absolute_path then
-          api.nvim_buf_set_name(buf, new_name)
-          -- to avoid the 'overwrite existing file' error message on write
-          vim.api.nvim_buf_call(buf, function() vim.cmd("silent! w!") end)
-        end
-      end
-    end
+    rename_loaded_buffers(node.absolute_path, new_name)
     events._dispatch_node_renamed(abs_path, new_name)
     lib.refresh_tree()
   end
@@ -297,7 +310,7 @@ end
 
 function M.paste(node)
   if clipboard.move[1] ~= nil then
-    return do_paste(node, 'move', luv.fs_rename)
+    return do_paste(node, 'move', do_cut)
   end
 
   return do_paste(node, 'copy', do_copy)
